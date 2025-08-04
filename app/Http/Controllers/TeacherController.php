@@ -82,6 +82,24 @@ class TeacherController extends Controller
             'teachers' => $teachers
         ]);
     }
+
+    public function show($id)
+    {
+        $teacher = Teacher::with('user')->find($id);
+
+        if (!$teacher) {
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Teacher not found',
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'teacher' => $teacher,
+        ]);
+    }
+
     public function update(Request $request, $id)
     {
         
@@ -155,4 +173,25 @@ class TeacherController extends Controller
             ], 500);
         }
     }
+    public function destroy($id)
+    {
+        $teacher = Teacher::find($id);
+
+        if (!$teacher) {
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Teacher not found',
+            ], 404);
+        }
+
+        $user = $teacher->user;
+        $teacher->delete();
+        $user->delete(); // delete linked user too
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Teacher and user deleted successfully',
+        ]);
+    }
+
 }
