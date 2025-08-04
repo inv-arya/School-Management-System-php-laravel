@@ -131,7 +131,27 @@ class StudentController extends Controller
             $students = Student::with(['user:id,username,email', 'assignedTeacher:id,first_name,last_name'])
                 ->where('assigned_teacher_id', $teacher->id)
                 ->get();
-        } else {
+        }
+        elseif ($user->role === 'student') {
+            
+            $student = Student::with(['user:id,username,email', 'assignedTeacher:id,first_name,last_name'])
+                ->where('user_id', $user->id)
+                ->first();
+
+            if (!$student) {
+                return response()->json([
+                    'status' => 'fail',
+                    'message' => 'Student record not found',
+                ], 404);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'students' => [$student],  
+            ]);
+        }
+        
+        else {
             return response()->json([
                 'status' => 'fail',
                 'message' => 'Unauthorized',
@@ -144,11 +164,42 @@ class StudentController extends Controller
             'students' => $students
         ]);
     }
+
+    public function show($id)
+    {
+        $user = JWTAuth::user();
+        $student = Student::with(['user:id,username,email', 'assignedTeacher:id,first_name,last_name'])->find($id);
+
+        if (!$student) {
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Student not found',
+            ], 404);
+        }
+
+        
+        if ($user->role === 'teacher') {
+            $teacher = Teacher::where('user_id', $user->id)->first();
+            if (!$teacher || $student->assigned_teacher_id !== $teacher->id) {
+                return response()->json([
+                    'status' => 'fail',
+                    'message' => 'Unauthorized to view this student',
+                ], 403);
+            }
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'student' => $student,
+        ]);
+    }
+
+
     public function update(Request $request, $id)
     {
         $user = JWTAuth::user();
 
-        // Find student with user relation
+       
         $student = Student::with('user')->find($id);
 
         if (!$student) {
@@ -158,7 +209,7 @@ class StudentController extends Controller
             ], 404);
         }
 
-        // Check access for teacher
+        
         if ($user->role === 'teacher') {
             $teacher = Teacher::where('user_id', $user->id)->first();
             if (!$teacher || $student->assigned_teacher_id !== $teacher->id) {
@@ -169,7 +220,7 @@ class StudentController extends Controller
             }
         }
 
-        // Allow only admin or teacher
+        
         if (!in_array($user->role, ['admin', 'teacher'])) {
             return response()->json([
                 'status' => 'fail',
@@ -177,7 +228,7 @@ class StudentController extends Controller
             ], 403);
         }
 
-        // Validate data
+        
         $validator = Validator::make($request->all(), [
             'first_name' => 'sometimes|required|string',
             'last_name'  => 'sometimes|required|string',
@@ -239,4 +290,36 @@ class StudentController extends Controller
             ], 500);
         }
     }
+    public function destroy($id)
+    {
+        $user = JWTAuth::user();
+        $student = Student::find($id);
+
+        if (!$student) {
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Student not found',
+            ], 404);
+        }
+
+        
+        if ($user->role === 'teacher') {
+            $teacher = Teacher::where('user_id', $user->id)->first();
+            if (!$teacher || $student->assigned_teacher_id !== $teacher->id) {
+                return response()->json([
+                    'status' => 'fail',
+                    'message' => 'Unauthorized to delete this student',
+                ], 403);
+            }
+        }
+
+        $student->user()->delete();  
+        $student->delete();          
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Student and user deleted successfully',
+        ]);
+    }
+
 }
