@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Student;
 use App\Models\Teacher;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\DB;
 
 class StudentController extends Controller
 {
@@ -142,5 +143,100 @@ class StudentController extends Controller
             'count' => $students->count(),
             'students' => $students
         ]);
+    }
+    public function update(Request $request, $id)
+    {
+        $user = JWTAuth::user();
+
+        // Find student with user relation
+        $student = Student::with('user')->find($id);
+
+        if (!$student) {
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Student not found.',
+            ], 404);
+        }
+
+        // Check access for teacher
+        if ($user->role === 'teacher') {
+            $teacher = Teacher::where('user_id', $user->id)->first();
+            if (!$teacher || $student->assigned_teacher_id !== $teacher->id) {
+                return response()->json([
+                    'status' => 'fail',
+                    'message' => 'Unauthorized to edit this student.',
+                ], 403);
+            }
+        }
+
+        // Allow only admin or teacher
+        if (!in_array($user->role, ['admin', 'teacher'])) {
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Unauthorized access.',
+            ], 403);
+        }
+
+        // Validate data
+        $validator = Validator::make($request->all(), [
+            'first_name' => 'sometimes|required|string',
+            'last_name'  => 'sometimes|required|string',
+            'email'      => 'sometimes|required|email|unique:users,email,' . $student->user_id,
+            'username'   => 'sometimes|required|string|unique:users,username,' . $student->user_id,
+            'password'   => 'nullable|string|min:6',
+            'phone_number' => 'sometimes|required|string',
+            'roll_number'  => 'sometimes|required|string|unique:students,roll_number,' . $student->id,
+            'grade'        => 'sometimes|required|string',
+            'date_of_birth' => 'sometimes|required|date',
+            'admission_date' => 'sometimes|required|date',
+            'status'        => 'sometimes|required|in:active,inactive',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'fail',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Update User
+            $student->user->username = $request->input('username', $student->user->username);
+            $student->user->email = $request->input('email', $student->user->email);
+            if ($request->filled('password')) {
+                $student->user->password = Hash::make($request->password);
+            }
+            $student->user->save();
+
+            // Update Student
+            $student->update([
+                'first_name' => $request->input('first_name', $student->first_name),
+                'last_name'  => $request->input('last_name', $student->last_name),
+                'email'      => $request->input('email', $student->email),
+                'phone_number' => $request->input('phone_number', $student->phone_number),
+                'roll_number'  => $request->input('roll_number', $student->roll_number),
+                'grade'        => $request->input('grade', $student->grade),
+                'date_of_birth' => $request->input('date_of_birth', $student->date_of_birth),
+                'admission_date' => $request->input('admission_date', $student->admission_date),
+                'status'        => $request->input('status', $student->status),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Student updated successfully.',
+                'student' => $student->load('user'),
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Update failed.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 }
