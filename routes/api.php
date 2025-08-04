@@ -19,3 +19,13 @@ Route::middleware(['auth:api', 'role:admin'])->group(function () {
 Route::middleware(['auth:api', 'role:admin,teacher'])->group(function () {
     Route::get('/students', [StudentController::class, 'index']);
 });
+Route::middleware(['auth:api', 'role:admin'])->group(function () {
+    
+    Route::put('/teachers/{id}', [TeacherController::class, 'update']);
+    
+});
+Route::middleware(['auth:api', 'role:admin,teacher'])->group(function () {
+    Route::put('/students/{id}', [StudentController::class, 'update']);
+});
+
+

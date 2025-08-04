@@ -82,4 +82,77 @@ class TeacherController extends Controller
             'teachers' => $teachers
         ]);
     }
+    public function update(Request $request, $id)
+    {
+        
+        $teacher = Teacher::with('user')->find($id);
+
+        if (!$teacher) {
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Teacher not found',
+            ], 404);
+        }
+
+        
+        $validator = Validator::make($request->all(), [
+            'first_name' => 'sometimes|required|string',
+            'last_name'  => 'sometimes|required|string',
+            'email'      => 'sometimes|required|email|unique:users,email,' . $teacher->user_id,
+            'username'   => 'sometimes|required|string|unique:users,username,' . $teacher->user_id,
+            'phone_number' => 'sometimes|required|string',
+            'subject_specialization' => 'sometimes|required|string',
+            'employee_id' => 'sometimes|required|string|unique:teachers,employee_id,' . $teacher->id,
+            'date_of_joining' => 'sometimes|required|date',
+            'status' => 'sometimes|required|in:active,inactive',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'fail',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+           
+            $teacher->user->username = $request->input('username', $teacher->user->username);
+            $teacher->user->email = $request->input('email', $teacher->user->email);
+
+            // if ($request->filled('password')) {
+            //     $teacher->user->password = Hash::make($request->password);
+            // }
+
+            $teacher->user->save();
+
+            
+            $teacher->update([
+                'first_name' => $request->input('first_name', $teacher->first_name),
+                'last_name' => $request->input('last_name', $teacher->last_name),
+                'phone_number' => $request->input('phone_number', $teacher->phone_number),
+                'subject_specialization' => $request->input('subject_specialization', $teacher->subject_specialization),
+                'employee_id' => $request->input('employee_id', $teacher->employee_id),
+                'date_of_joining' => $request->input('date_of_joining', $teacher->date_of_joining),
+                'status' => $request->input('status', $teacher->status),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Teacher updated successfully',
+                'teacher' => $teacher->load('user'),
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'fail',
+                'message' => 'Update failed',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }
