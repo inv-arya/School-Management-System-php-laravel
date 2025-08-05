@@ -45,16 +45,11 @@ class AuthController extends Controller
             
             
             return response()->json([
-                'status' => 'success',
-                'user' => [
+                
                     'username' => $user->username,
                     'role' => $user->role,
-                ],
-                'token' => [
-                    'access_token' => $token,
+                    'access' => $token,
                     
-                ]
-                
                 
             ]);
             echo("test user1");
