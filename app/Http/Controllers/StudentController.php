@@ -115,7 +115,10 @@ class StudentController extends Controller
         $user = JWTAuth::user();
 
         if ($user->role === 'admin') {
-            $students = Student::with(['user:id,username,email', 'assignedTeacher:id,first_name,last_name'])->get();
+            $students = Student::with(['user:id,username,email', 'assignedTeacher:id,first_name,last_name'])
+            ->where('status', 'active')
+            ->paginate(2); 
+
         } elseif ($user->role === 'teacher') {
             
             $teacher = Teacher::where('user_id', $user->id)->first();
@@ -130,7 +133,8 @@ class StudentController extends Controller
             
             $students = Student::with(['user:id,username,email', 'assignedTeacher:id,first_name,last_name'])
                 ->where('assigned_teacher_id', $teacher->id)
-                ->get();
+                ->where('status', 'active')
+                ->paginate(2);
         }
         elseif ($user->role === 'student') {
             
@@ -160,7 +164,7 @@ class StudentController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'count' => $students->count(),
+            'count' => $students->total(),
             'students' => $students
         ]);
     }

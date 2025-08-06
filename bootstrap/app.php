@@ -3,7 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Http\Middleware\HandleCors;
+
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -14,12 +14,16 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
 
-    // $middleware->append(\Illuminate\Http\Middleware\HandleCors::class);
+    
     
     $middleware->alias([
         'role' => \App\Http\Middleware\RoleMiddleware::class,
     ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
-    })->create();
+            $exceptions->renderable(function (\Symfony\Component\Routing\Exception\RouteNotFoundException $e, $request) {
+    if ($request->is('api/*')) {
+        return response()->json(['message' => 'Unauthorized - No token provided'], 401);
+    }
+    });
+})->create();
