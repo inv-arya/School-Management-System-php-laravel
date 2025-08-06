@@ -72,16 +72,16 @@ class TeacherController extends Controller
             ], 500);
         }
     }
-    public function index()
-    {
-        $teachers = Teacher::with('user:id,username,email')->get();
+  public function index()
+{
+    $teachers = Teacher::with('user:id,username,email')->paginate(5); // paginate instead of get()
 
-        return response()->json([
-            'status' => 'success',
-            'count' => $teachers->count(),
-            'teachers' => $teachers
-        ]);
-    }
+    return response()->json([
+        'status' => 'success',
+        'count' => $teachers->total(), // use total() for paginated result
+        'teachers' => $teachers
+    ]);
+}
 
     public function show($id)
     {
