@@ -8,12 +8,14 @@ use Illuminate\Support\Facades\Validator;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 use PHPOpenSourceSaver\JWTAuth\Exceptions\JWTException;
 
+
+use PHPOpenSourceSaver\JWTAuth\Exceptions\TokenExpiredException; 
+use PHPOpenSourceSaver\JWTAuth\Exceptions\TokenInvalidException; 
+
 class AuthController extends Controller
 {
     public function login(Request $request)
-
     {
-        
         $validator = Validator::make($request->all(), [
             'username' => 'required|string|exists:users,username',
             'password' => 'required|string|min:6',
@@ -28,31 +30,27 @@ class AuthController extends Controller
 
         $credentials = $request->only('username', 'password');
 
-        
         try {
-
             if (!$token = JWTAuth::attempt($credentials)) {
                 return response()->json([
                     'status' => 'fail',
                     'message' => 'Invalid credentials',
                 ], 401);
-                
             }
-                        
+
+            $user = JWTAuth::user();
+
+           
+            $refreshToken = $this->createRefreshToken($user);
 
             
-            $user = JWTAuth::user();
-            
-            
             return response()->json([
-                
-                    'username' => $user->username,
-                    'role' => $user->role,
-                    'access' => $token,
-                    
+                'username'      => $user->username,
+                'role'          => $user->role,
+                'access'  => $token,
+                'refresh' => $refreshToken, 
                 
             ]);
-            echo("test user1");
 
         } catch (JWTException $e) {
             return response()->json([
@@ -62,12 +60,9 @@ class AuthController extends Controller
         }
     }
 
-    
-
     public function logout()
     {
         try {
-            
             JWTAuth::invalidate(JWTAuth::getToken());
 
             return response()->json([
@@ -80,5 +75,61 @@ class AuthController extends Controller
                 'message' => 'Logout failed',
             ], 500);
         }
+    }
+
+    
+    public function refresh(Request $request)
+    {
+        $request->validate([
+            'refresh_token' => 'required|string'
+        ]);
+
+        try {
+            $payload = JWTAuth::setToken($request->refresh_token)->getPayload();
+
+            
+            if ($payload->get('type') !== 'refresh') {
+                return response()->json(['error' => 'Invalid refresh token'], 401);
+            }
+
+            $user = User::find($payload->get('sub'));
+
+            if (!$user) {
+                return response()->json(['error' => 'User not found'], 404);
+            }
+
+            
+            $newAccessToken  = JWTAuth::fromUser($user);
+            $newRefreshToken = $this->createRefreshToken($user);
+
+            return response()->json([
+                'access'  => $newAccessToken,
+                'refresh' => $newRefreshToken,
+                'token_type'    => 'bearer',
+                'expires_in'    => config('jwt.ttl') * 60
+            ]);
+
+        } catch (TokenExpiredException $e) { 
+            return response()->json(['error' => 'Refresh token expired'], 401);
+        } catch (TokenInvalidException $e) { 
+            return response()->json(['error' => 'Invalid refresh token'], 401);
+        } catch (JWTException $e) {
+            return response()->json(['error' => 'Token error'], 500);
+        }
+    }
+
+    
+    private function createRefreshToken($user = null)
+    {
+        $user = $user ?: auth()->user();
+
+        $payload = [
+            'sub'  => $user->id,
+            'type' => 'refresh', 
+            'iat'  => now()->timestamp,
+            'exp'  => now()->addDays(30)->timestamp, 
+        ];
+
+        return JWTAuth::getJWTProvider()->encode($payload);
     }
 }

@@ -6,6 +6,7 @@ use App\Http\Controllers\TeacherController;
 use App\Http\Controllers\StudentController;
 
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/refresh', [AuthController::class, 'refresh']);
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:api');
 Route::middleware(['auth:api', 'role:admin'])->group(function () {
     Route::post('/register-teacher', [TeacherController::class, 'register']);
