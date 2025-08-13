@@ -100,13 +100,11 @@ class AuthController extends Controller
 
             
             $newAccessToken  = JWTAuth::fromUser($user);
-            $newRefreshToken = $this->createRefreshToken($user);
+            // $newRefreshToken = $this->createRefreshToken($user);
 
             return response()->json([
                 'access'  => $newAccessToken,
-                'refresh' => $newRefreshToken,
-                'token_type'    => 'bearer',
-                'expires_in'    => config('jwt.ttl') * 60
+                // 'refresh' => $newRefreshToken,
             ]);
 
         } catch (TokenExpiredException $e) { 
